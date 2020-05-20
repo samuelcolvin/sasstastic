@@ -1,0 +1,11 @@
+/.idea/
+/env/
+/env-minimal/
+*.py[cod]
+*.egg-info/
+htmlcov/
+.coverage
+/todo/
+/sandbox/
+/build/
+/dist/

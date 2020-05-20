@@ -1,0 +1,6 @@
+-r tests/requirements.txt
+
+httpx==0.12.1
+pydantic==1.5.1
+typer==0.1.0
+watchgod==0.6
