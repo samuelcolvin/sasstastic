@@ -33,9 +33,7 @@ def log_config(log_level: str) -> dict:
         'handlers': {
             'sasstastic': {'level': log_level, 'class': 'sasstastic.logs.ClickHandler', 'formatter': 'default'},
         },
-        'loggers': {
-            'sasstastic': {'handlers': ['sasstastic'], 'level': log_level, 'propagate': False},
-        },
+        'loggers': {'sasstastic': {'handlers': ['sasstastic'], 'level': log_level, 'propagate': False}},
     }
 
 

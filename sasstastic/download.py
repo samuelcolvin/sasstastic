@@ -1,13 +1,13 @@
 import asyncio
 import logging
+import zipfile
+from io import BytesIO
 from pathlib import Path
 from typing import List
-from io import BytesIO
-import zipfile
 
 from httpx import AsyncClient
 
-from .models import SourceModel, SasstasticError, is_file_path
+from .models import SasstasticError, SourceModel, is_file_path
 
 logger = logging.getLogger('sasstastic.download')
 

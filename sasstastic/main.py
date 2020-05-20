@@ -2,8 +2,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from .models import load_config
 from .download import download
+from .models import load_config
 
 logger = logging.getLogger('sasstastic.main')
 

@@ -1,11 +1,10 @@
 import logging
 import re
 from pathlib import Path
-from typing import Optional, Pattern, List, Dict
-
-from pydantic import BaseModel, HttpUrl, validator, ValidationError
+from typing import Dict, List, Optional, Pattern
 
 import yaml
+from pydantic import BaseModel, HttpUrl, ValidationError, validator
 from pydantic.error_wrappers import display_errors
 
 try:
@@ -62,7 +61,15 @@ class ConfigModel(BaseModel):
 
 
 def load_config(config_file: Path) -> ConfigModel:
-    data = yaml.load(config_file.read_text(), Loader=Loader)
+    if not config_file.is_file():
+        logger.error('%s does not exist', config_file)
+        raise SasstasticError('config files does not exist')
+    try:
+        with config_file.open('r') as f:
+            data = yaml.load(f, Loader=Loader)
+    except yaml.YAMLError as e:
+        logger.error('invalid YAML file %s:\n%s', config_file, e)
+        raise SasstasticError('invalid YAML file')
     try:
         config = ConfigModel.parse_obj(data)
     except ValidationError as exc:
