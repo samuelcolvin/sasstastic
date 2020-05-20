@@ -6,9 +6,15 @@ from pathlib import Path
 
 from httpx import AsyncClient
 
-from .models import DownloadModel, SasstasticError, SourceModel, is_file_path
+from .common import SasstasticError, is_file_path
+from .config import DownloadModel, SourceModel
 
+__all__ = ('download_sass',)
 logger = logging.getLogger('sasstastic.download')
+
+
+def download_sass(m: DownloadModel):
+    asyncio.run(Downloader(m).download())
 
 
 class Downloader:
@@ -71,7 +77,3 @@ class Downloader:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(content)
         return p
-
-
-def download(m: DownloadModel):
-    asyncio.run(Downloader(m).download())

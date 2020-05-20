@@ -7,11 +7,14 @@ import yaml
 from pydantic import BaseModel, HttpUrl, ValidationError, validator
 from pydantic.error_wrappers import display_errors
 
+from .common import SasstasticError, is_file_path
+
 try:
     from yaml import CLoader as Loader
 except ImportError:
     from yaml import Loader
 
+__all__ = 'SourceModel', 'DownloadModel', 'ConfigModel', 'load_config'
 logger = logging.getLogger('sasstastic.models')
 
 
@@ -91,11 +94,3 @@ def load_config(config_file: Path) -> ConfigModel:
     if not config.output_dir.is_absolute():
         config.output_dir = config_dir / config.output_dir
     return config
-
-
-class SasstasticError(RuntimeError):
-    pass
-
-
-def is_file_path(p: Optional[Path]) -> bool:
-    return p is not None and re.search(r'\.[a-zA-Z0-9]{1,5}$', p.name)

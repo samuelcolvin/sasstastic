@@ -11,14 +11,16 @@ from typing import Union
 import click
 import sass
 
-from .models import ConfigModel, SasstasticError
+from .common import SasstasticError
+from .config import ConfigModel
 
+__all__ = ('compile_sass',)
 logger = logging.getLogger('sasstastic.build')
 STARTS_DOWNLOAD = re.compile('^(?:DOWNLOAD|DL)/')
 STARTS_SRC = re.compile('^SRC/')
 
 
-def build(config: ConfigModel):
+def compile_sass(config: ConfigModel):
     return SassCompiler(config).build()
 
 
