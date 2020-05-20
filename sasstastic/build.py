@@ -19,10 +19,10 @@ STARTS_SRC = re.compile('^SRC/')
 
 
 def build(config: ConfigModel):
-    return SassGenerator(config).build()
+    return SassCompiler(config).build()
 
 
-class SassGenerator:
+class SassCompiler:
     def __init__(self, config: ConfigModel):
         self._config = config
         self._build_dir = config.build_dir
@@ -54,12 +54,24 @@ class SassGenerator:
 
         self._out_dir.mkdir(parents=True, exist_ok=True)
         if self._dev_mode:
-            out_dir_src = self._out_dir / '.src'
+            self._src_dir = out_dir_src = self._out_dir / '.src'
             if out_dir_src.exists():
                 logger.info('deleting %s prior to build', out_dir_src)
                 shutil.rmtree(str(out_dir_src))
-            logger.info('copying build files to %s to aid with development maps', out_dir_src)
-            shutil.copytree(str(self._build_dir.resolve()), str(out_dir_src))
+
+            shutil.copytree(str(self._build_dir), str(out_dir_src))
+            files = sum(f.is_file() for f in out_dir_src.glob('**/*'))
+            logger.info('%28s/* ➤ %-30s %3d files', self._build_dir, out_dir_src, files)
+
+            try:
+                self._download_dir = out_dir_src / self._download_dir.relative_to(self._build_dir)
+            except ValueError:
+                # download dir is not inside the build dir, need to copy libs too
+                out_dir_libs = self._out_dir / '.libs'
+                shutil.copytree(str(self._download_dir), str(out_dir_libs))
+                files = sum(f.is_file() for f in out_dir_libs.glob('**/*'))
+                logger.info('%28s/* ➤ %-30s %3d files', self._download_dir, out_dir_libs, files)
+                self._download_dir = out_dir_src
 
         if self._size_cache_file.exists():
             with self._size_cache_file.open() as f:
@@ -87,11 +99,8 @@ class SassGenerator:
             return
         if self._config.exclude_files and self._config.exclude_files.search(str(f)):
             return
-        try:
-            f.relative_to(self._download_dir)
-        except ValueError:
-            pass
-        else:
+
+        if is_relative_to(f, self._download_dir):
             return
 
         rel_path = f.relative_to(self._src_dir)
@@ -166,9 +175,9 @@ class SassGenerator:
             if abs(change_p) > 0.5:
                 c = 'green' if change_p <= 0 else 'red'
                 change_p = click.style('{:+0.0f}%'.format(change_p), fg=c)
-                logger.info('%30s ➤ %-30s %7s %s', src, dst, fmt_size(size), change_p)
+                logger.info('%30s ➤ %-30s %9s %s', src, dst, fmt_size(size), change_p)
         if c is None:
-            logger.info('%30s ➤ %-30s %7s', src, dst, fmt_size(size))
+            logger.info('%30s ➤ %-30s %9s', src, dst, fmt_size(size))
 
     def _clever_imports(self, src_path):
         _new_path = None
@@ -206,3 +215,12 @@ def fmt_size(num):
         return f'{num / KB:0.1f}KB'
     else:
         return f'{num / MB:0.1f}MB'
+
+
+def is_relative_to(p1: Path, p2: Path) -> bool:
+    try:
+        p1.relative_to(p2)
+    except ValueError:
+        return False
+    else:
+        return True
