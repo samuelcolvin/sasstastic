@@ -3,19 +3,18 @@ import logging
 import zipfile
 from io import BytesIO
 from pathlib import Path
-from typing import List
 
 from httpx import AsyncClient
 
-from .models import SasstasticError, SourceModel, is_file_path
+from .models import SasstasticError, SourceModel, is_file_path, DownloadModel
 
 logger = logging.getLogger('sasstastic.download')
 
 
 class Downloader:
-    def __init__(self, download_dir: Path, sources: List[SourceModel]):
-        self._download_dir = download_dir
-        self._sources = sources
+    def __init__(self, m: DownloadModel):
+        self._download_dir = m.dir
+        self._sources = m.sources
         self._client = AsyncClient()
 
     async def download(self):
@@ -74,6 +73,5 @@ class Downloader:
         return p
 
 
-def download(download_dir: Path, sources: List[SourceModel]):
-    d = Downloader(download_dir, sources)
-    asyncio.run(d.download())
+def download(m: DownloadModel):
+    asyncio.run(Downloader(m).download())

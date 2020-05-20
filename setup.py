@@ -49,6 +49,7 @@ setup(
     python_requires='>=3.6',
     zip_safe=True,
     install_requires=[
+        'libsass>=0.20.0',
         'httpx>=0.12.1',
         'pydantic>=1.5',
         'typer>=0.1.0',

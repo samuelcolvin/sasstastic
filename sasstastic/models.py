@@ -58,6 +58,11 @@ class ConfigModel(BaseModel):
     build_dir: Path
     output_dir: Path
     wipe_output_dir: bool = False
+    include_files: Pattern = re.compile(r'^[^_].+\.(?:css|sass|scss)$')
+    exclude_files: Optional[Pattern] = None
+    replace: Optional[Dict[Pattern, Dict[Pattern, str]]] = None
+    file_hashes: bool = False
+    dev: bool = False
 
 
 def load_config(config_file: Path) -> ConfigModel:
