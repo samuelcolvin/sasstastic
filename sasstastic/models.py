@@ -62,7 +62,7 @@ class ConfigModel(BaseModel):
     exclude_files: Optional[Pattern] = None
     replace: Optional[Dict[Pattern, Dict[Pattern, str]]] = None
     file_hashes: bool = False
-    dev: bool = False
+    dev_mode: bool = True
 
 
 def load_config(config_file: Path) -> ConfigModel:

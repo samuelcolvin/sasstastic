@@ -6,7 +6,7 @@ from pathlib import Path
 
 from httpx import AsyncClient
 
-from .models import SasstasticError, SourceModel, is_file_path, DownloadModel
+from .models import DownloadModel, SasstasticError, SourceModel, is_file_path
 
 logger = logging.getLogger('sasstastic.download')
 
@@ -18,7 +18,7 @@ class Downloader:
         self._client = AsyncClient()
 
     async def download(self):
-        logger.info('downloading %d files to %s', len(self._sources), self._download_dir)
+        logger.info('\ndownloading %d files to %s', len(self._sources), self._download_dir)
         try:
             await asyncio.gather(*[self._download_source(s) for s in self._sources])
         finally:
@@ -49,7 +49,7 @@ class Downloader:
                     continue
                 regex_pattern, match, file_path = None, None, None
                 for r, t in s.extract.items():
-                    match = r.search(filepath)
+                    match = r.match(filepath)
                     if match:
                         regex_pattern, file_path = r, t
                         break

@@ -27,12 +27,8 @@ class SassGenerator:
         self._config = config
         self._build_dir = config.build_dir
         self._out_dir = config.output_dir
-        self._dev_mode = config.dev
-        if self._dev_mode:
-            self._out_dir_src = self._out_dir / '.src'
-            self._src_dir = self._out_dir_src
-        else:
-            self._src_dir = self._build_dir
+        self._dev_mode = config.dev_mode
+        self._src_dir = self._build_dir
         self._replace = config.replace or {}
         self._download_dir = config.download.dir
         self._importers = [(5, self._clever_imports)]
@@ -50,12 +46,20 @@ class SassGenerator:
     def build(self):
         start = time()
 
+        mode = 'dev' if self._dev_mode else 'prod'
+        logger.info('\ncompiling %s ➤ %s (mode: %s)', self._build_dir, self._out_dir, mode)
+        if self._config.wipe_output_dir:
+            logger.info('deleting %s prior to build', self._out_dir)
+            shutil.rmtree(str(self._out_dir))
+
+        self._out_dir.mkdir(parents=True, exist_ok=True)
         if self._dev_mode:
-            self._out_dir.mkdir(parents=True, exist_ok=True)
-            if self._out_dir_src.exists():
-                logger.info('deleting %s prior to build', self._out_dir_src)
-                shutil.rmtree(str(self._out_dir_src))
-            shutil.copytree(str(self._build_dir.resolve()), str(self._out_dir_src))
+            out_dir_src = self._out_dir / '.src'
+            if out_dir_src.exists():
+                logger.info('deleting %s prior to build', out_dir_src)
+                shutil.rmtree(str(out_dir_src))
+            logger.info('copying build files to %s to aid with development maps', out_dir_src)
+            shutil.copytree(str(self._build_dir.resolve()), str(out_dir_src))
 
         if self._size_cache_file.exists():
             with self._size_cache_file.open() as f:
@@ -83,7 +87,6 @@ class SassGenerator:
             return
         if self._config.exclude_files and self._config.exclude_files.search(str(f)):
             return
-
         try:
             f.relative_to(self._download_dir)
         except ValueError:
