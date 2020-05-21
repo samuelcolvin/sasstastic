@@ -3,18 +3,15 @@ from pathlib import Path
 from typing import Optional
 
 from .compile import compile_sass
-from .config import load_config
+from .config import ConfigModel
 from .download import download_sass
 
 logger = logging.getLogger('sasstastic.main')
 
 
-def download_and_compile(config_file: Path, alt_output_dir: Optional[Path], dev_mode: Optional[bool]):
-    config = load_config(config_file)
-    config.output_dir = alt_output_dir or config.output_dir
-    if dev_mode is not None:
-        config.dev_mode = dev_mode
-    logger.info('building using %s config file, output directory: %s', config_file, config.output_dir)
+def download_and_compile(config: ConfigModel, alt_output_dir: Optional[Path] = None, dev_mode: Optional[bool] = None):
+    logger.info('build path:  %s/', config.build_dir)
+    logger.info('output path: %s/', alt_output_dir or config.output_dir)
 
     download_sass(config)
-    compile_sass(config)
+    compile_sass(config, alt_output_dir, dev_mode)

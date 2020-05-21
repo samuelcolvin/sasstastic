@@ -4,7 +4,7 @@ from typing import Optional
 
 import typer
 
-from .config import SasstasticError
+from .config import SasstasticError, load_config
 from .logs import setup_logging
 from .main import download_and_compile
 from .version import VERSION
@@ -43,8 +43,10 @@ def build(
     setup_logging('DEBUG' if verbose else 'INFO')
     if config_path.is_dir():
         config_path /= 'sasstastic.yml'
+    logger.info('config path: %s', config_path)
     try:
-        download_and_compile(config_path, output_dir, dev_mode)
+        config = load_config(config_path)
+        download_and_compile(config, output_dir, dev_mode)
     except SasstasticError:
         raise typer.Exit(1)
 

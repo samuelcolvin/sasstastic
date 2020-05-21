@@ -6,7 +6,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from time import time
-from typing import Union
+from typing import Optional, Union
 
 import click
 import sass
@@ -20,16 +20,19 @@ STARTS_DOWNLOAD = re.compile('^(?:DOWNLOAD|DL)/')
 STARTS_SRC = re.compile('^SRC/')
 
 
-def compile_sass(config: ConfigModel):
-    return SassCompiler(config).build()
+def compile_sass(config: ConfigModel, alt_output_dir: Optional[Path] = None, dev_mode: Optional[bool] = None):
+    return SassCompiler(config, alt_output_dir, dev_mode).build()
 
 
 class SassCompiler:
-    def __init__(self, config: ConfigModel):
+    def __init__(self, config: ConfigModel, alt_output_dir: Optional[Path], dev_mode: Optional[bool]):
         self._config = config
         self._build_dir = config.build_dir
-        self._out_dir = config.output_dir
-        self._dev_mode = config.dev_mode
+        self._out_dir = alt_output_dir or config.output_dir
+        if dev_mode is None:
+            self._dev_mode = config.dev_mode
+        else:
+            self._dev_mode = dev_mode
         self._src_dir = self._build_dir
         self._replace = config.replace or {}
         self._download_dir = config.download.dir
@@ -49,16 +52,17 @@ class SassCompiler:
         start = time()
 
         mode = 'dev' if self._dev_mode else 'prod'
-        logger.info('\ncompiling "%s" to "%s" (mode: %s)', self._build_dir, self._out_dir, mode)
-        if self._config.wipe_output_dir:
-            logger.info('deleting %s prior to build', self._out_dir)
+        logger.info('\ncompiling "%s/" to "%s/" (mode: %s)', self._build_dir, self._out_dir, mode)
+        if self._config.wipe_output_dir and self._out_dir.exists():
+            assert self._out_dir.is_dir(), 'output_dir must be a directory'
+            logger.info('deleting %s/ prior to build', self._out_dir)
             shutil.rmtree(str(self._out_dir))
 
         self._out_dir.mkdir(parents=True, exist_ok=True)
         if self._dev_mode:
             self._src_dir = out_dir_src = self._out_dir / '.src'
             if out_dir_src.exists():
-                logger.info('deleting %s prior to build', out_dir_src)
+                logger.info('deleting %s/ prior to build', out_dir_src)
                 shutil.rmtree(str(out_dir_src))
 
             shutil.copytree(str(self._build_dir), str(out_dir_src))
@@ -167,7 +171,7 @@ class SassCompiler:
     def _log_file_creation(self, rel_path, css_path, css):
         src, dst = str(rel_path), str(css_path.relative_to(self._out_dir))
 
-        size = len(css)
+        size = len(css.encode())
         p = str(css_path)
         self._new_size_cache[p] = size
         old_size = self._old_size_cache.get(p)
