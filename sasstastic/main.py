@@ -15,6 +15,6 @@ def download_and_compile(config_file: Path, alt_output_dir: Optional[Path], dev_
     if dev_mode is not None:
         config.dev_mode = dev_mode
     logger.info('building using %s config file, output directory: %s', config_file, config.output_dir)
-    download_sass(config.download)
 
+    download_sass(config)
     compile_sass(config)

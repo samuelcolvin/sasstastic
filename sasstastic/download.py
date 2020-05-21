@@ -1,34 +1,53 @@
 import asyncio
+import hashlib
+import json
 import logging
 import zipfile
 from io import BytesIO
 from pathlib import Path
+from typing import Dict, List, Tuple, Set
 
 from httpx import AsyncClient
 
 from .common import SasstasticError, is_file_path
-from .config import DownloadModel, SourceModel
+from .config import ConfigModel, SourceModel
 
 __all__ = ('download_sass',)
 logger = logging.getLogger('sasstastic.download')
 
 
-def download_sass(m: DownloadModel):
-    asyncio.run(Downloader(m).download())
+def download_sass(config: ConfigModel):
+    asyncio.run(Downloader(config).download())
 
 
 class Downloader:
-    def __init__(self, m: DownloadModel):
-        self._download_dir = m.dir
-        self._sources = m.sources
+    def __init__(self, config: ConfigModel):
+        self._download_dir = config.download.dir
+        self._sources = config.download.sources
         self._client = AsyncClient()
+        self._lock_check = LockCheck(self._download_dir, config.lock_file)
 
     async def download(self):
-        logger.info('\ndownloading %d files to %s', len(self._sources), self._download_dir)
+        if not self._sources:
+            logger.info('\nno files to download')
+            return
+
+        to_download = [s for s in self._sources if self._lock_check.should_download(s)]
+        if not to_download:
+            logger.info('\nno new files to download, %d up-to-date', len(self._sources))
+            return
+
+        logger.info(
+            '\ndownloading %d files to %s, %d up-to-date',
+            len(to_download),
+            len(self._sources) - len(to_download),
+            self._download_dir
+        )
         try:
-            await asyncio.gather(*[self._download_source(s) for s in self._sources])
+            await asyncio.gather(*[self._download_source(s) for s in to_download])
         finally:
             await self._client.aclose()
+        self._lock_check.save()
 
     async def _download_source(self, s: SourceModel):
         logger.debug('%s: downloading...', s.url)
@@ -40,10 +59,11 @@ class Downloader:
         loop = asyncio.get_event_loop()
         if s.extract is None:
             path = await loop.run_in_executor(None, self._save_file, s.to, r.content)
-            logger.info('  downloaded %s ➤ %s', s.url, path)
+            self._lock_check.record(s, s.to, r.content)
+            logger.info('>>  downloaded %s ➤ %s', s.url, path)
         else:
             count = await loop.run_in_executor(None, self._extract_zip, s, r.content)
-            logger.info('  downloaded %s ➤ extract %d files', s.url, count)
+            logger.info('>>  downloaded %s ➤ extract %d files', s.url, count)
 
     def _extract_zip(self, s: SourceModel, content: bytes):
         zcopied = 0
@@ -68,7 +88,9 @@ class Downloader:
                         file_name = match.groupdict().get('filename') or match.groups()[-1]
                         file_path = file_path / file_name
                     logger.debug('%s: "%s" ➤ "%s" (regex: "%s")', s.url, filepath, file_path, regex_pattern)
-                    self._save_file(file_path, zipf.read(filepath))
+                    content = zipf.read(filepath)
+                    self._lock_check.record(s, file_path, content)
+                    self._save_file(file_path, content)
                     zcopied += 1
         return zcopied
 
@@ -77,3 +99,49 @@ class Downloader:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(content)
         return p
+
+
+class LockCheck:
+    """
+    Avoid downloading unchanged files by consulting a "lock file" cache.
+    """
+    def __init__(self, root_dir: Path, lock_file: Path):
+        self._root_dir = root_dir
+        self._lock_file = lock_file
+        if lock_file.is_file():
+            with lock_file.open() as f:
+                self._cache = {d['url']: d['files'] for d in (json.loads(j) for j in f)}
+        else:
+            self._cache: Dict[str, List[Tuple[str, str]]] = {}
+        self._checked: Set[str] = set()
+        self._new: Set[str] = set()
+
+    def should_download(self, s: SourceModel) -> bool:
+        url = str(s.url)
+        files = self._cache.get(url)
+        if files is None:
+            return True
+        else:
+            self._checked.add(url)
+            return not any(self._file_unchanged(*v) for v in files)
+
+    def record(self, s: SourceModel, path: Path, content: bytes):
+        url = str(s.url)
+        r = str(path), hashlib.md5(content).hexdigest()
+        self._new.add(url)
+        files = self._cache.get(url)
+        if files is None:
+            self._cache[url] = [r]
+        else:
+            files.append(r)
+
+    def save(self):
+        # not_checked = self._cache.keys() - self._checked
+        # debug(not_checked)
+        active = self._checked | self._new
+        s = '\n'.join(json.dumps(dict(url=u, files=f)) for u, f in self._cache.items() if u in active)
+        self._lock_file.write_text(s)
+
+    def _file_unchanged(self, path: str, file_hash: str) -> bool:
+        p = self._root_dir / path
+        return p.is_file() and hashlib.md5(p.read_bytes()).hexdigest() == file_hash

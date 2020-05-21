@@ -1,7 +1,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Pattern
+from typing import Dict, List, Optional, Pattern, Any
 
 import yaml
 from pydantic import BaseModel, HttpUrl, ValidationError, validator
@@ -60,12 +60,29 @@ class ConfigModel(BaseModel):
     download: Optional[DownloadModel] = None
     build_dir: Path
     output_dir: Path
+    lock_file: Path = Path('.sasstastic.lock')
     wipe_output_dir: bool = False
     include_files: Pattern = re.compile(r'^[^_].+\.(?:css|sass|scss)$')
     exclude_files: Optional[Pattern] = None
     replace: Optional[Dict[Pattern, Dict[Pattern, str]]] = None
     file_hashes: bool = False
     dev_mode: bool = True
+
+    @classmethod
+    def parse_obj(cls, config_directory: Path, obj: Dict[str, Any]) -> 'ConfigModel':
+        m: ConfigModel = super().parse_obj(obj)
+        if not m.download.dir.is_absolute():
+            m.download.dir = config_directory / m.download.dir
+
+        if not m.build_dir.is_absolute():
+            m.build_dir = config_directory / m.build_dir
+
+        if not m.output_dir.is_absolute():
+            m.output_dir = config_directory / m.output_dir
+
+        if not m.lock_file.is_absolute():
+            m.lock_file = config_directory / m.lock_file
+        return m
 
 
 def load_config(config_file: Path) -> ConfigModel:
@@ -79,18 +96,7 @@ def load_config(config_file: Path) -> ConfigModel:
         logger.error('invalid YAML file %s:\n%s', config_file, e)
         raise SasstasticError('invalid YAML file')
     try:
-        config = ConfigModel.parse_obj(data)
+        return ConfigModel.parse_obj(config_file.parent, data)
     except ValidationError as exc:
         logger.error('Error parsing %s:\n%s', config_file, display_errors(exc.errors()))
         raise SasstasticError('error parsing config file')
-    config_dir = config_file.parent
-
-    if not config.download.dir.is_absolute():
-        config.download.dir = config_dir / config.download.dir
-
-    if not config.build_dir.is_absolute():
-        config.build_dir = config_dir / config.build_dir
-
-    if not config.output_dir.is_absolute():
-        config.output_dir = config_dir / config.output_dir
-    return config

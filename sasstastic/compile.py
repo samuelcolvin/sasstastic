@@ -49,7 +49,7 @@ class SassCompiler:
         start = time()
 
         mode = 'dev' if self._dev_mode else 'prod'
-        logger.info('\ncompiling %s ➤ %s (mode: %s)', self._build_dir, self._out_dir, mode)
+        logger.info('\ncompiling "%s" to "%s" (mode: %s)', self._build_dir, self._out_dir, mode)
         if self._config.wipe_output_dir:
             logger.info('deleting %s prior to build', self._out_dir)
             shutil.rmtree(str(self._out_dir))
@@ -63,7 +63,7 @@ class SassCompiler:
 
             shutil.copytree(str(self._build_dir), str(out_dir_src))
             files = sum(f.is_file() for f in out_dir_src.glob('**/*'))
-            logger.info('%28s/* ➤ %-30s %3d files', self._build_dir, out_dir_src, files)
+            logger.info('>>  %28s/* ➤ %-30s %3d files', self._build_dir, out_dir_src, files)
 
             try:
                 self._download_dir = out_dir_src / self._download_dir.relative_to(self._build_dir)
@@ -177,9 +177,9 @@ class SassCompiler:
             if abs(change_p) > 0.5:
                 c = 'green' if change_p <= 0 else 'red'
                 change_p = click.style('{:+0.0f}%'.format(change_p), fg=c)
-                logger.info('%30s ➤ %-30s %9s %s', src, dst, fmt_size(size), change_p)
+                logger.info('>>  %30s ➤ %-30s %9s %s', src, dst, fmt_size(size), change_p)
         if c is None:
-            logger.info('%30s ➤ %-30s %9s', src, dst, fmt_size(size))
+            logger.info('>>  %30s ➤ %-30s %9s', src, dst, fmt_size(size))
 
     def _clever_imports(self, src_path):
         _new_path = None

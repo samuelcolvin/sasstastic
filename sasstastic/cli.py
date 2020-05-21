@@ -36,7 +36,7 @@ def build(
     version: bool = typer.Option(None, '--version', callback=version_callback, is_eager=True, help=VERSION_HELP),
 ):
     """
-    Compile sass/scss files to css.
+    Fantastic SASS and SCSS compilation.
 
     Takes a single argument: a path to a sasstastic.yml config file, or a directory containing a sasstastic.yml file.
     """

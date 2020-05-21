@@ -7,16 +7,17 @@ import click
 class ClickHandler(logging.Handler):
     formats = {
         logging.DEBUG: {'fg': 'white', 'dim': True},
-        logging.INFO: {'fg': 'cyan'},
+        logging.INFO: {'fg': 'green'},
         logging.WARN: {'fg': 'yellow'},
     }
 
-    def get_log_format(self, record):
-        return self.formats.get(record.levelno, {'fg': 'red'})
-
     def emit(self, record):
         log_entry = self.format(record)
-        click.secho(log_entry, **self.get_log_format(record))
+        if record.levelno == logging.INFO and log_entry.startswith('>>'):
+            click.secho(log_entry[2:], fg='cyan')
+        else:
+            fmt = self.formats.get(record.levelno, {'fg': 'red'})
+            click.secho(log_entry, **fmt)
 
 
 def log_config(log_level: str) -> dict:
