@@ -1,7 +1,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Pattern, Any
+from typing import Any, Dict, List, Optional, Pattern
 
 import yaml
 from pydantic import BaseModel, HttpUrl, ValidationError, validator

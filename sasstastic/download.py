@@ -4,8 +4,9 @@ import json
 import logging
 import zipfile
 from io import BytesIO
+from itertools import chain
 from pathlib import Path
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Set, Tuple
 
 from httpx import AsyncClient
 
@@ -33,21 +34,21 @@ class Downloader:
             return
 
         to_download = [s for s in self._sources if self._lock_check.should_download(s)]
-        if not to_download:
+        if to_download:
+            logger.info(
+                '\ndownloading %d files to %s, %d up-to-date',
+                len(to_download),
+                self._download_dir,
+                len(self._sources) - len(to_download),
+            )
+            try:
+                await asyncio.gather(*[self._download_source(s) for s in to_download])
+            finally:
+                await self._client.aclose()
+            self._lock_check.save()
+        else:
             logger.info('\nno new files to download, %d up-to-date', len(self._sources))
-            return
-
-        logger.info(
-            '\ndownloading %d files to %s, %d up-to-date',
-            len(to_download),
-            len(self._sources) - len(to_download),
-            self._download_dir
-        )
-        try:
-            await asyncio.gather(*[self._download_source(s) for s in to_download])
-        finally:
-            await self._client.aclose()
-        self._lock_check.save()
+        self._lock_check.delete_stale()
 
     async def _download_source(self, s: SourceModel):
         logger.debug('%s: downloading...', s.url)
@@ -105,43 +106,53 @@ class LockCheck:
     """
     Avoid downloading unchanged files by consulting a "lock file" cache.
     """
+
     def __init__(self, root_dir: Path, lock_file: Path):
         self._root_dir = root_dir
         self._lock_file = lock_file
         if lock_file.is_file():
             with lock_file.open() as f:
-                self._cache = {d['url']: d['files'] for d in (json.loads(j) for j in f)}
+                self._cache = json.load(f)
         else:
             self._cache: Dict[str, List[Tuple[str, str]]] = {}
-        self._checked: Set[str] = set()
-        self._new: Set[str] = set()
+        self._active: Set[str] = set()
 
     def should_download(self, s: SourceModel) -> bool:
-        url = str(s.url)
-        files = self._cache.get(url)
+        k = self._hash_source(s)
+        files = self._cache.get(k)
         if files is None:
             return True
         else:
-            self._checked.add(url)
+            self._active.add(k)
             return not any(self._file_unchanged(*v) for v in files)
 
     def record(self, s: SourceModel, path: Path, content: bytes):
-        url = str(s.url)
+        k = self._hash_source(s)
         r = str(path), hashlib.md5(content).hexdigest()
-        self._new.add(url)
-        files = self._cache.get(url)
+        self._active.add(k)
+        files = self._cache.get(k)
         if files is None:
-            self._cache[url] = [r]
+            self._cache[k] = [r]
         else:
             files.append(r)
 
     def save(self):
-        # not_checked = self._cache.keys() - self._checked
-        # debug(not_checked)
-        active = self._checked | self._new
-        s = '\n'.join(json.dumps(dict(url=u, files=f)) for u, f in self._cache.items() if u in active)
-        self._lock_file.write_text(s)
+        lines = ',\n'.join(f'  "{k}": {json.dumps(v)}' for k, v in self._cache.items() if k in self._active)
+        self._lock_file.write_text(f'{{\n{lines}\n}}')
+
+    def delete_stale(self):
+        d_files = set(chain.from_iterable((p for p, _ in f) for u, f in self._cache.items() if u in self._active))
+        for p in self._root_dir.glob('**/*'):
+            rel_path = str(p.relative_to(self._root_dir))
+            if rel_path not in d_files and p.is_file():
+                p.unlink()
+                logger.info('>>  %s stale and deleted', rel_path)
 
     def _file_unchanged(self, path: str, file_hash: str) -> bool:
         p = self._root_dir / path
         return p.is_file() and hashlib.md5(p.read_bytes()).hexdigest() == file_hash
+
+    @staticmethod
+    def _hash_source(s: SourceModel):
+        j = str(s.url), None if s.extract is None else {str(k): str(v) for k, v in s.extract.items()}, str(s.to)
+        return hashlib.md5(json.dumps(j).encode()).hexdigest()
