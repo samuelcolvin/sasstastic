@@ -4,7 +4,7 @@ black = black -S -l 120 --target-version py37 sasstastic tests
 
 .PHONY: install
 install:
-	pip install -U setuptools pip
+	python -m pip install -U setuptools pip
 	pip install -U -r requirements.txt
 	pip install -U -e .
 

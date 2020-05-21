@@ -24,7 +24,6 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Intended Audience :: Developers',
@@ -46,7 +45,7 @@ setup(
         [console_scripts]
         sasstastic=sasstastic.__main__:cli
     """,
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     zip_safe=True,
     install_requires=[
         'libsass>=0.20.0',
