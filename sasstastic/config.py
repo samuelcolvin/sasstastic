@@ -23,6 +23,10 @@ class SourceModel(BaseModel):
     extract: Optional[Dict[Pattern, Optional[Path]]] = None
     to: Optional[Path] = None
 
+    @validator('url', pre=True)
+    def remove_spaces_from_url(cls, v):
+        return v and v.replace(' ', '')
+
     @validator('extract', each_item=True)
     def check_extract_path(cls, v):
         if v is not None and v.is_absolute():

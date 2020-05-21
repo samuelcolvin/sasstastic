@@ -2,11 +2,12 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import zipfile
 from io import BytesIO
 from itertools import chain
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, Set, Tuple
 
 from httpx import AsyncClient
 
@@ -107,14 +108,21 @@ class LockCheck:
     Avoid downloading unchanged files by consulting a "lock file" cache.
     """
 
+    file_description = (
+        "# this files records information about files downloaded by sasstastic \n"  # noqa: Q000
+        "# to allow unnecessary downloads to be skipped.\n"  # noqa: Q000
+        "# You should't edit it manually and should include it in version control."
+    )
+
     def __init__(self, root_dir: Path, lock_file: Path):
         self._root_dir = root_dir
         self._lock_file = lock_file
         if lock_file.is_file():
-            with lock_file.open() as f:
-                self._cache = json.load(f)
+            lines = (ln for ln in lock_file.read_text().split('\n') if not re.match(r'\s*#', ln))
+            c = json.loads('\n'.join(lines))
+            self._cache: Dict[str, Set[Tuple[str, str]]] = {k: {tuple(f) for f in v} for k, v in c.items()}
         else:
-            self._cache: Dict[str, List[Tuple[str, str]]] = {}
+            self._cache = {}
         self._active: Set[str] = set()
 
     def should_download(self, s: SourceModel) -> bool:
@@ -137,8 +145,8 @@ class LockCheck:
             files.append(r)
 
     def save(self):
-        lines = ',\n'.join(f'  "{k}": {json.dumps(v)}' for k, v in self._cache.items() if k in self._active)
-        self._lock_file.write_text(f'{{\n{lines}\n}}')
+        lines = ',\n'.join(f'  "{k}": {json.dumps(sorted(v))}' for k, v in self._cache.items() if k in self._active)
+        self._lock_file.write_text(f'{self.file_description}\n{{\n{lines}\n}}')
 
     def delete_stale(self):
         d_files = set(chain.from_iterable((p for p, _ in f) for u, f in self._cache.items() if u in self._active))
