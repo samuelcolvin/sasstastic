@@ -20,7 +20,6 @@ jobs:
     env:
       PYTHON: ${{ matrix.python-version }}
       OS: ${{ matrix.os }}
-      EXTRAS: yes
 
     runs-on: ${{ matrix.os }}-latest
 

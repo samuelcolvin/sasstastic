@@ -29,6 +29,12 @@ testcov:
 	@echo "building coverage html"
 	@coverage html
 
+.PHONY: check-dist
+check-dist:
+	python setup.py check -ms
+	python setup.py sdist
+	twine check dist/*
+
 .PHONY: all
 all: lint testcov
 

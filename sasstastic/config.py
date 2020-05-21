@@ -15,7 +15,7 @@ except ImportError:
     from yaml import Loader
 
 __all__ = 'SourceModel', 'DownloadModel', 'ConfigModel', 'load_config'
-logger = logging.getLogger('sasstastic.models')
+logger = logging.getLogger('sasstastic.config')
 
 
 class SourceModel(BaseModel):

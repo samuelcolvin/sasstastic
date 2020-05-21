@@ -15,7 +15,7 @@ from .common import SasstasticError
 from .config import ConfigModel
 
 __all__ = ('compile_sass',)
-logger = logging.getLogger('sasstastic.build')
+logger = logging.getLogger('sasstastic.compile')
 STARTS_DOWNLOAD = re.compile('^(?:DOWNLOAD|DL)/')
 STARTS_SRC = re.compile('^SRC/')
 

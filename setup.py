@@ -14,7 +14,7 @@ except FileNotFoundError:
 version = SourceFileLoader('version', 'sasstastic/version.py').load_module()
 
 setup(
-    name='sasstastic-web',
+    name='sasstastic',
     version=str(version.VERSION),
     description=description,
     long_description=long_description,
@@ -52,6 +52,7 @@ setup(
         'libsass>=0.20.0',
         'httpx>=0.12.1',
         'pydantic>=1.5',
+        'PyYAML>=5.3.1',
         'typer>=0.1.0',
         'watchgod>=0.6',
     ],
