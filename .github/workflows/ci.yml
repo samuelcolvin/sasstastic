@@ -42,12 +42,14 @@ jobs:
         make check-dist
 
     - name: test
-      run: make test
+      run: |
+        make test
+        coverage xml
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v1.0.7
       with:
         file: ./coverage.xml
-        env_vars: PYTHON,OS
+        env_vars: OS,PYTHON
 
   deploy:
     name: Deploy
