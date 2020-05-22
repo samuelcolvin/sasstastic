@@ -21,7 +21,7 @@ def version_callback(value: bool):
 
 OUTPUT_HELP = 'Custom directory to output css files, if omitted the "output_dir" field from the config file is used.'
 DEV_MODE_HELP = 'Whether to compile in development or production mode, if omitted the value is taken from config.'
-WATCH_HELP = 'Whether to watch the config file and build directory and re-compile on file changes.'
+WATCH_HELP = 'Whether to watch the config file and build directory then download and compile after file changes.'
 VERBOSE_HELP = 'Print more information to the console.'
 VERSION_HELP = 'Show the version and exit.'
 
@@ -33,7 +33,7 @@ def build(
         None, '-o', '--output-dir', file_okay=False, dir_okay=True, readable=True, help=OUTPUT_HELP
     ),
     dev_mode: bool = typer.Option(None, '--dev/--prod', help=DEV_MODE_HELP),
-    watch_mode: bool = typer.Option(False, '--watch/-dont-watch', help=WATCH_HELP),
+    watch_mode: bool = typer.Option(False, '--watch/--dont-watch', help=WATCH_HELP),
     verbose: bool = typer.Option(False, help=VERBOSE_HELP),
     version: bool = typer.Option(None, '--version', callback=version_callback, is_eager=True, help=VERSION_HELP),
 ):
