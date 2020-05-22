@@ -73,7 +73,8 @@ jobs:
       - name: build
         run: python setup.py sdist bdist_wheel
 
-      - run: twine check dist/*
+      - name: check dist
+        run: twine check dist/*
 
       - name: check tag
         run: PACKAGE=sasstastic python <(curl -Ls https://git.io/JvQsH)

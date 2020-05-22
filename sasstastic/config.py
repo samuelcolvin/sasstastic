@@ -71,10 +71,15 @@ class ConfigModel(BaseModel):
     replace: Optional[Dict[Pattern, Dict[Pattern, str]]] = None
     file_hashes: bool = False
     dev_mode: bool = True
+    config_file: Path
 
     @classmethod
-    def parse_obj(cls, config_directory: Path, obj: Dict[str, Any]) -> 'ConfigModel':
+    def parse_obj(cls, config_file: Path, obj: Dict[str, Any]) -> 'ConfigModel':
+        if isinstance(obj, dict):
+            obj['config_file'] = config_file
         m: ConfigModel = super().parse_obj(obj)
+
+        config_directory = config_file.parent
         if not m.download.dir.is_absolute():
             m.download.dir = config_directory / m.download.dir
 
@@ -99,8 +104,9 @@ def load_config(config_file: Path) -> ConfigModel:
     except yaml.YAMLError as e:
         logger.error('invalid YAML file %s:\n%s', config_file, e)
         raise SasstasticError('invalid YAML file')
+
     try:
-        return ConfigModel.parse_obj(config_file.parent, data)
+        return ConfigModel.parse_obj(config_file, data)
     except ValidationError as exc:
         logger.error('Error parsing %s:\n%s', config_file, display_errors(exc.errors()))
         raise SasstasticError('error parsing config file')

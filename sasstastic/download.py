@@ -14,7 +14,7 @@ from httpx import AsyncClient
 from .common import SasstasticError, is_file_path
 from .config import ConfigModel, SourceModel
 
-__all__ = ('download_sass',)
+__all__ = ('download_sass', 'Downloader')
 logger = logging.getLogger('sasstastic.download')
 
 
@@ -58,7 +58,7 @@ class Downloader:
             logger.error('Error downloading %r, unexpected status code: %s', s.url, r.status_code)
             raise SasstasticError(f'unexpected status code {r.status_code}')
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         if s.extract is None:
             path = await loop.run_in_executor(None, self._save_file, s.to, r.content)
             self._lock_check.record(s, s.to, r.content)
