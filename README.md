@@ -31,7 +31,7 @@ download:
   # downloaded files will be saved in this directory
   dir: styles/.libs
   sources:
-    # download a font css file from google fonts and save it to goog-fonts.css
+    # download a font css file from google fonts and save it to google-fonts.css
     - url: >
        https://fonts.googleapis.com/css?
        family=Merriweather:400,400i,700,700i|Titillium+Web|Ubuntu+Mono&display=swap

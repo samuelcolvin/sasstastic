@@ -3,14 +3,14 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from watchgod import awatch
+import watchgod
 
 from .compile import compile_sass
 from .config import ConfigModel, load_config
 from .download import Downloader, download_sass
 
 logger = logging.getLogger('sasstastic.main')
-__all__ = 'download_and_compile', 'watch'
+__all__ = 'download_and_compile', 'watch', 'awatch'
 
 
 def download_and_compile(config: ConfigModel, alt_output_dir: Optional[Path] = None, dev_mode: Optional[bool] = None):
@@ -22,21 +22,20 @@ def download_and_compile(config: ConfigModel, alt_output_dir: Optional[Path] = N
 
 
 def watch(config: ConfigModel, alt_output_dir: Optional[Path] = None, dev_mode: Optional[bool] = None):
-    logger.info('build path:  %s/', config.build_dir)
-    logger.info('output path: %s/', alt_output_dir or config.output_dir)
-
     try:
-        asyncio.run(async_watch(config, alt_output_dir, dev_mode))
+        asyncio.run(awatch(config, alt_output_dir, dev_mode))
     except KeyboardInterrupt:
         pass
 
 
-async def async_watch(config: ConfigModel, alt_output_dir: Optional[Path] = None, dev_mode: Optional[bool] = None):
-    config_file = str(config.config_file)
+async def awatch(config: ConfigModel, alt_output_dir: Optional[Path] = None, dev_mode: Optional[bool] = None):
+    logger.info('build path:  %s/', config.build_dir)
+    logger.info('output path: %s/', alt_output_dir or config.output_dir)
 
     await Downloader(config).download()
     compile_sass(config, alt_output_dir, dev_mode)
 
+    config_file = str(config.config_file)
     async for changes in watch_multiple(config_file, config.build_dir):
         changed_paths = {c[1] for c in changes}
         if config_file in changed_paths:
@@ -51,7 +50,7 @@ async def async_watch(config: ConfigModel, alt_output_dir: Optional[Path] = None
 
 
 async def watch_multiple(*paths):
-    watchers = [awatch(p) for p in paths]
+    watchers = [watchgod.awatch(p) for p in paths]
     while True:
         done, pending = await asyncio.wait([w.__anext__() for w in watchers], return_when=asyncio.FIRST_COMPLETED)
         for t in pending:
