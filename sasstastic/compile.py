@@ -4,13 +4,13 @@ import logging
 import re
 import shutil
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from time import time
 from typing import Optional, Union
 
 import click
 import sass
-from decorator import contextmanager
 
 from .common import SasstasticError
 from .config import ConfigModel
