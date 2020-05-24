@@ -10,6 +10,7 @@ from typing import Optional, Union
 
 import click
 import sass
+from decorator import contextmanager
 
 from .common import SasstasticError
 from .config import ConfigModel
@@ -21,18 +22,24 @@ STARTS_SRC = re.compile('^SRC/')
 
 
 def compile_sass(config: ConfigModel, alt_output_dir: Optional[Path] = None, dev_mode: Optional[bool] = None):
-    return SassCompiler(config, alt_output_dir, dev_mode).build()
+    if dev_mode is None:
+        dev_mode = config.dev_mode
+    else:
+        dev_mode = dev_mode
+    mode = 'dev' if dev_mode else 'prod'
+    out_dir: Path = alt_output_dir or config.output_dir
+    logger.info('\ncompiling "%s/" to "%s/" (mode: %s)', config.build_dir, out_dir, mode)
+    with tmpdir() as tmp_path:
+        SassCompiler(config, tmp_path, dev_mode).build()
+        fast_move(tmp_path, out_dir)
 
 
 class SassCompiler:
-    def __init__(self, config: ConfigModel, alt_output_dir: Optional[Path], dev_mode: Optional[bool]):
+    def __init__(self, config: ConfigModel, tmp_out_dir: Path, dev_mode: bool):
         self._config = config
         self._build_dir = config.build_dir
-        self._out_dir = alt_output_dir or config.output_dir
-        if dev_mode is None:
-            self._dev_mode = config.dev_mode
-        else:
-            self._dev_mode = dev_mode
+        self._tmp_out_dir = tmp_out_dir
+        self._dev_mode = dev_mode
         self._src_dir = self._build_dir
         self._replace = config.replace or {}
         self._download_dir = config.download.dir
@@ -48,35 +55,24 @@ class SassCompiler:
         self._errors = 0
         self._files_generated = 0
 
-    def build(self):
+    def build(self) -> None:
         start = time()
 
-        mode = 'dev' if self._dev_mode else 'prod'
-        logger.info('\ncompiling "%s/" to "%s/" (mode: %s)', self._build_dir, self._out_dir, mode)
-        if self._config.wipe_output_dir and self._out_dir.exists():
-            assert self._out_dir.is_dir(), 'output_dir must be a directory'
-            logger.info('deleting %s/ prior to build', self._out_dir)
-            shutil.rmtree(str(self._out_dir))
-
-        self._out_dir.mkdir(parents=True, exist_ok=True)
         if self._dev_mode:
-            self._src_dir = out_dir_src = self._out_dir / '.src'
-            if out_dir_src.exists():
-                logger.info('deleting %s/ prior to build', out_dir_src)
-                shutil.rmtree(str(out_dir_src))
+            self._src_dir = out_dir_src = self._tmp_out_dir / '.src'
 
             shutil.copytree(str(self._build_dir), str(out_dir_src))
             files = sum(f.is_file() for f in out_dir_src.glob('**/*'))
-            logger.info('>>  %28s/* ➤ %-30s %3d files', self._build_dir, out_dir_src, files)
+            logger.info('>>  %28s/* ➤ %-30s %3d files', self._build_dir, '.src/', files)
 
             try:
                 self._download_dir = out_dir_src / self._download_dir.relative_to(self._build_dir)
             except ValueError:
                 # download dir is not inside the build dir, need to copy libs too
-                out_dir_libs = self._out_dir / '.libs'
+                out_dir_libs = self._tmp_out_dir / '.libs'
                 shutil.copytree(str(self._download_dir), str(out_dir_libs))
                 files = sum(f.is_file() for f in out_dir_libs.glob('**/*'))
-                logger.info('%28s/* ➤ %-30s %3d files', self._download_dir, out_dir_libs, files)
+                logger.info('%28s/* ➤ %-30s %3d files', self._download_dir, '.libs/', files)
                 self._download_dir = out_dir_src
 
         if self._size_cache_file.exists():
@@ -90,11 +86,12 @@ class SassCompiler:
             json.dump(self._new_size_cache, f, indent=2)
 
         time_taken = (time() - start) * 1000
+        plural = '' if self._files_generated == 1 else 's'
         if not self._errors:
-            logger.info('%d css files generated in %0.0fms, 0 errors', self._files_generated, time_taken)
+            logger.info('%d css file%s generated in %0.0fms, 0 errors', self._files_generated, plural, time_taken)
         else:
             logger.error(
-                '%d css files generated in %0.0fms, %d errors', self._files_generated, time_taken, self._errors
+                '%d css file%s generated in %0.0fms, %d errors', self._files_generated, plural, time_taken, self._errors
             )
             raise SasstasticError('sass errors')
 
@@ -110,7 +107,7 @@ class SassCompiler:
             return
 
         rel_path = f.relative_to(self._src_dir)
-        css_path = (self._out_dir / rel_path).with_suffix('.css')
+        css_path = (self._tmp_out_dir / rel_path).with_suffix('.css')
 
         map_path = css_path.with_name(css_path.name + '.map') if self._dev_mode else None
 
@@ -169,7 +166,7 @@ class SassCompiler:
         return css, log_msg
 
     def _log_file_creation(self, rel_path, css_path, css):
-        src, dst = str(rel_path), str(css_path.relative_to(self._out_dir))
+        src, dst = str(rel_path), str(css_path.relative_to(self._tmp_out_dir))
 
         size = len(css.encode())
         p = str(css_path)
@@ -193,6 +190,49 @@ class SassCompiler:
             _new_path = self._download_dir / STARTS_DOWNLOAD.sub('', src_path)
 
         return _new_path and [(str(_new_path),)]
+
+
+@contextmanager
+def tmpdir():
+    d = tempfile.mkdtemp()
+    try:
+        yield Path(d)
+    finally:
+        shutil.rmtree(d)
+
+
+def _move_dir(src: str, dst: str, exists: bool):
+    if exists:
+        shutil.rmtree(dst)
+    shutil.move(src, dst)
+
+
+def fast_move(src_dir: Path, dst_dir: Path):
+    """
+    Move all files and directories from src_dir to dst_dir, files are moved first. This tries to be relatively fast.
+    """
+
+    to_move = []
+    to_rename = []
+    for src_path in src_dir.iterdir():
+        if src_path.is_file():
+            to_rename.append((src_path, dst_dir / src_path.relative_to(src_dir)))
+        else:
+            assert src_path.is_dir(), src_path
+            dst = dst_dir / src_path.relative_to(src_dir)
+            to_move.append((str(src_path), str(dst), dst.exists()))
+
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    s = time()
+    # files in the root of src_dir are moved first, these are generally the scss files which
+    # should be updated first to avoid styles not changing when a browser reloads
+    for src, dst in to_rename:
+        src.rename(dst)
+    for src, dst, exists in to_move:
+        if exists:
+            shutil.rmtree(dst)
+        shutil.move(src, dst)
+    logger.debug('filed from %s/ to %s/ in %0.1fms', src_dir, dst_dir, (time() - s) * 1000)
 
 
 def insert_hash(path: Path, content: Union[str, bytes], *, hash_length=7):

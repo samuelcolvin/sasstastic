@@ -45,7 +45,6 @@ async def awatch(config: ConfigModel, alt_output_dir: Optional[Path] = None, dev
 
         if changed_paths != {config_file}:
             logger.info('changes detected in the build directory, re-compiling...')
-            config.wipe_output_dir = False
             compile_sass(config, alt_output_dir, dev_mode)
 
 

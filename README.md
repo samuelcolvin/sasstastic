@@ -51,8 +51,6 @@ download:
 build_dir: styles/
 # and saved to this directory
 output_dir: css/
-# the output directory "css/" will be deleted before all builds
-wipe_output_dir: true
 ```
 
 Then run `sasstastic` to build your sass files.
@@ -68,3 +66,7 @@ note:
   * in **development** mode css is not compressed, a map file is created and all files from `build_dir` and 
     `download.dir` are copied into `output_dir` so map files work correctly
   * in **production** mode css is compressed, no other files are added to `output_dir`
+
+### Watch mode
+
+You can watch a directory and config file and run sasstastic when files change using `sasstastic --watch`.

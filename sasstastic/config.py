@@ -65,7 +65,6 @@ class ConfigModel(BaseModel):
     build_dir: Path
     output_dir: Path
     lock_file: Path = Path('.sasstastic.lock')
-    wipe_output_dir: bool = False
     include_files: Pattern = re.compile(r'^[^_].+\.(?:css|sass|scss)$')
     exclude_files: Optional[Pattern] = None
     replace: Optional[Dict[Pattern, Dict[Pattern, str]]] = None
