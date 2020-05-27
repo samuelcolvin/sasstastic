@@ -140,9 +140,9 @@ class LockCheck:
         self._active.add(k)
         files = self._cache.get(k)
         if files is None:
-            self._cache[k] = [r]
+            self._cache[k] = {r}
         else:
-            files.append(r)
+            files.add(r)
 
     def save(self):
         lines = ',\n'.join(f'  "{k}": {json.dumps(sorted(v))}' for k, v in self._cache.items() if k in self._active)
